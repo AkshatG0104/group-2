@@ -1,6 +1,6 @@
 # Group-2
 
-![Methodology overview](Methodology.png)
+![Methodology overview](Methodology.jpg)
 
 Group-2 is a systematic trading machine-learning coursework project. The project builds meta-models on top of a supplied primary trading signal for futures markets. For each active primary signal, the meta-model estimates the probability that taking the trade will be profitable under a triple-barrier exit rule.
 
@@ -11,6 +11,7 @@ The coursework pipeline follows the required structure:
 3. Model development and comparison across linear, tree-based, and neural-network models.
 4. Cluster-level feature importance.
 5. Out-of-sample model evaluation and final prediction generation.
+6. Optional portfolio weight allocation from meta-model probabilities.
 
 ## Universe
 
@@ -22,7 +23,7 @@ The raw data covers 11 instruments across three asset classes:
 | Energy | `CL1S`, `HO1S`, `RB1S`, `NG1S` |
 | Metals | `GC1S`, `SI1S`, `HG1S`, `PL1S` |
 
-The final submitted prediction file in this repository is focused on the energy instruments.
+Our final modelling focus and documentation are on the energy instruments: `CL1S`, `HO1S`, `RB1S`, and `NG1S`.
 
 ## Repository Structure
 
@@ -40,9 +41,14 @@ The final submitted prediction file in this repository is focused on the energy 
 |   +-- Tree/                        # Random forest experiments
 +-- 04_feature_importance/           # Selected-model refit and cluster importance
 +-- 05_model_evaluation/             # Final out-of-sample evaluation scripts/notebooks
-+-- 06_results/                      # Final prediction output
++-- 06_results/                      # Final prediction and strategy weight outputs
++-- 07_portfolio_weight_allocation_strategy/
+|   +-- allocate_portfolio_weights.py
+|   +-- neural_portfolio_allocator.py
+|   +-- visualise_strategy_weights.py
+|   +-- README.md
 +-- data/raw/                        # Supplied OHLCV and primary signal data
-+-- Methodology.png                  # Pipeline diagram
++-- Methodology.jpg                  # Pipeline diagram
 +-- requirements.txt                 # Python dependencies
 ```
 
@@ -174,10 +180,58 @@ The final output format is:
 date,instrument,prediction
 ```
 
-The current final output is:
+The current final probability output is:
 
 ```text
 06_results/final_predictions.csv
+```
+
+### 6. Portfolio Weight Allocation
+
+The optional strategy layer converts meta-model probabilities into signed portfolio weights for the energy instruments. It uses the primary signal for direction, the meta-model probability for conviction, and volatility targeting to scale positions.
+
+Methodology:
+
+- Fixed allocator: filters out probabilities at or below `0.50`, uses the primary signal as trade direction, sizes by model confidence, then applies volatility targeting and exposure caps.
+- Neural allocator: learns a conviction score with `conviction_strength = tanh(x @ beta + ticker_bias) ** 2`, using technical features, primary signal, probability features, and instrument bias.
+- The neural training objective in code is `objective = sharpe - exposure_cost - turnover_cost`, which is equivalent to minimizing the loss `-sharpe + exposure_cost + turnover_cost`.
+- Early stopping is based on validation Sharpe, and the neural overlay sizes accepted primary signals without flipping their direction.
+
+Run the fixed rule-based allocator:
+
+```bash
+python 07_portfolio_weight_allocation_strategy/allocate_portfolio_weights.py \
+  --probability-csv 06_results/final_predictions.csv \
+  --output-dir 07_portfolio_weight_allocation_strategy/outputs
+```
+
+Run the neural allocation overlay:
+
+```bash
+python 07_portfolio_weight_allocation_strategy/neural_portfolio_allocator.py \
+  --inference-probability-csv 06_results/final_predictions.csv
+```
+
+The neural allocator also expects an in-sample probability file and merged feature matrix when training from scratch:
+
+```text
+deliverables/insample_predicitons/insample_predictions.csv
+data/features/merged_feature_matrix.csv
+```
+
+Compare the fixed and neural strategies:
+
+```bash
+python 07_portfolio_weight_allocation_strategy/visualise_strategy_weights.py \
+  --fixed-weights 07_portfolio_weight_allocation_strategy/outputs/strategy_weights.csv \
+  --neural-weights 07_portfolio_weight_allocation_strategy/outputs/neural_portfolio/neural_strategy_weights.csv \
+  --output-dir 07_portfolio_weight_allocation_strategy/outputs/strategy_comparison
+```
+
+The current final neural strategy weight output is:
+
+```text
+06_results/neural_strategy_weights.csv
 ```
 
 ## Methodology Notes
@@ -187,6 +241,8 @@ The current final output is:
 - HMM regime probabilities are computed with filtered probabilities to avoid future leakage.
 - The default evaluation split uses a clean 2022+ out-of-sample window.
 - Feature importance is reported at both feature and cluster levels to account for correlated predictors.
+- The portfolio allocation layer applies a 10% target volatility, 25% per-instrument cap, and 100% daily gross exposure cap.
+- The neural portfolio overlay minimizes penalized negative Sharpe through the equivalent maximization objective `sharpe - exposure_cost - turnover_cost`.
 
 ## Reproducibility Checklist
 
@@ -198,5 +254,7 @@ Before rerunning later stages, make sure the upstream artifacts exist:
 | Model notebooks | Engineered feature matrix and triple-barrier label files |
 | Cluster feature importance | `results/model_comparison.csv` |
 | Final evaluation | `results/selected_model_run_configs.csv` |
+| Fixed portfolio allocation | `06_results/final_predictions.csv`, `data/raw/primary_signals.csv`, `data/raw/ohlcv_data.csv` |
+| Neural portfolio allocation | `data/features/merged_feature_matrix.csv`, in-sample probabilities, final probabilities |
 
 If a script cannot find an expected file, rerun the earlier stage that creates it.
