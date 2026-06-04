@@ -1,17 +1,202 @@
-![Alt text](Methodology.png)
+# Group-2
 
-1. pip install -r requirements.txt
-2. 01_feature_engineering/hmm/regime_detection.py
-3. 01_feature_engineering/hmm/regime_categories.py
-4. 01_feature_engineering/technical_analysis/technical_analysis.py
-5. 01_feature_engineering/feature_engineering_matrix.ipynb
-6. 01_feature_engineering/initial_feature_selection_with_low_variance_fixed.ipynb
-7. 02_triple_barrier/run_triple_barrier_configs.py
-8. 03_model_development/Linear/logistic_regression
-9. 03_model_development/Neural Network/variable_selection_network_ho1s.ipynb
-10. 03_model_development/Neural Network/variable_selection_network_cl1s.ipynb
-11. 03_model_development/Neural Network/variable_selection_network_ng1s.ipynb
-12. 03_model_development/Neural Network/variable_selection_network_rb1s.ipynb
-13. 03_model_development/Tree/random_forest.ipynb
-14. 04_feature_importance/feature_importance.ipynb
-15. 05_model_evaluation/05_model_evaluation.ipynb
+![Methodology overview](Methodology.png)
+
+Group-2 is a systematic trading machine-learning coursework project. The project builds meta-models on top of a supplied primary trading signal for futures markets. For each active primary signal, the meta-model estimates the probability that taking the trade will be profitable under a triple-barrier exit rule.
+
+The coursework pipeline follows the required structure:
+
+1. Feature engineering from OHLCV data.
+2. Triple-barrier labeling and meta-label construction.
+3. Model development and comparison across linear, tree-based, and neural-network models.
+4. Cluster-level feature importance.
+5. Out-of-sample model evaluation and final prediction generation.
+
+## Universe
+
+The raw data covers 11 instruments across three asset classes:
+
+| Asset class | Instruments |
+| --- | --- |
+| Equity index futures | `ES1S`, `NQ1S`, `FESX1S` |
+| Energy | `CL1S`, `HO1S`, `RB1S`, `NG1S` |
+| Metals | `GC1S`, `SI1S`, `HG1S`, `PL1S` |
+
+The final submitted prediction file in this repository is focused on the energy instruments.
+
+## Repository Structure
+
+```text
+.
++-- 01_feature_engineering/
+|   +-- hmm/                         # HMM latent regime features
+|   +-- technical_analysis/          # Technical indicator feature library
+|   +-- *.ipynb                      # Feature matrix and initial filtering notebooks
++-- 02_triple_barrier/               # Triple-barrier labeling utilities and batch configs
++-- 03_model_development/
+|   +-- Feature Selection/           # Correlation clustering and PCA helpers
+|   +-- Linear/                      # Logistic regression experiments
+|   +-- Neural Network/              # Variable Selection Network notebooks
+|   +-- Tree/                        # Random forest experiments
++-- 04_feature_importance/           # Selected-model refit and cluster importance
++-- 05_model_evaluation/             # Final out-of-sample evaluation scripts/notebooks
++-- 06_results/                      # Final prediction output
++-- data/raw/                        # Supplied OHLCV and primary signal data
++-- Methodology.png                  # Pipeline diagram
++-- requirements.txt                 # Python dependencies
+```
+
+## Setup
+
+Create and activate a virtual environment, then install the project dependencies:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+For notebook work, register the environment as a Jupyter kernel:
+
+```bash
+python -m ipykernel install --user --name group-2 --display-name "Group-2"
+```
+
+## Data Inputs
+
+Required raw files are stored in `data/raw/`:
+
+| File | Description |
+| --- | --- |
+| `ohlcv_data.csv` | Daily futures OHLCV panel with `date`, `instrument`, `open`, `high`, `low`, `close`, `volume`, and `open_interest`. |
+| `primary_signals.csv` | Daily primary model signals in wide format, with one column per instrument and values in `{-1, 0, 1}`. |
+
+Generated feature, label, model, and evaluation files are written under `data/features/`, `results/`, `deliverables/`, or `06_results/` depending on the stage.
+
+## Pipeline
+
+Run the project from the repository root.
+
+### 1. Feature Engineering
+
+Generate technical analysis features:
+
+```bash
+python 01_feature_engineering/technical_analysis/technical_analysis.py
+```
+
+Generate HMM latent regime features and interpreted regime categories:
+
+```bash
+python 01_feature_engineering/hmm/regime_detection.py
+python 01_feature_engineering/hmm/regime_categories.py
+```
+
+Then run the feature notebooks:
+
+```text
+01_feature_engineering/feature_engineering_matrix.ipynb
+01_feature_engineering/initial_feature_selection_with_low_variance_fixed.ipynb
+```
+
+### 2. Triple-Barrier Labels
+
+Generate label files for all instruments and configured barrier settings:
+
+```bash
+python 02_triple_barrier/run_triple_barrier_configs.py
+```
+
+This writes instrument/config-level label files to:
+
+```text
+data/features/triple_barrier/
+```
+
+The implementation supports EWMA, rolling, Parkinson, and Garman-Klass volatility estimates. The batch script currently uses multiple take-profit/stop-loss widths and vertical barrier horizons.
+
+### 3. Model Development
+
+Run the model-development notebooks:
+
+```text
+03_model_development/Linear/logisitic_regression.ipynb
+03_model_development/Tree/random_forest.ipynb
+03_model_development/Neural Network/variable_selection_network_cl1s.ipynb
+03_model_development/Neural Network/variable_selection_network_ho1s.ipynb
+03_model_development/Neural Network/variable_selection_network_rb1s.ipynb
+03_model_development/Neural Network/variable_selection_network_ng1s.ipynb
+```
+
+The comparison workflow is expected to produce:
+
+```text
+results/model_comparison.csv
+```
+
+### 4. Feature Importance
+
+After `results/model_comparison.csv` exists, compute feature-level and cluster-level importance for selected models:
+
+```bash
+python 04_feature_importance/cluster_feature_importance.py
+```
+
+Key outputs:
+
+```text
+results/feature_importance_top3_by_auc.csv
+results/feature_importance_selected_models.csv
+results/selected_model_run_configs.csv
+results/feature_importance_feature_level.csv
+results/feature_importance_cluster_level.csv
+```
+
+### 5. Model Evaluation
+
+Run the evaluation notebook or script:
+
+```text
+05_model_evaluation/model_evaluation.ipynb
+```
+
+To regenerate a final prediction CSV with the script and keep it in the repository's current result folder:
+
+```bash
+python 05_model_evaluation/evaluate_selected_models.py \
+  --config-path results/selected_model_run_configs.csv \
+  --output-path 06_results/final_predictions.csv
+```
+
+The final output format is:
+
+```text
+date,instrument,prediction
+```
+
+The current final output is:
+
+```text
+06_results/final_predictions.csv
+```
+
+## Methodology Notes
+
+- The meta-model target is the binary `metalabel`, which indicates whether following the primary signal was profitable by the first barrier touch or timeout.
+- The triple-barrier stage excludes zero primary-signal rows before labeling.
+- HMM regime probabilities are computed with filtered probabilities to avoid future leakage.
+- The default evaluation split uses a clean 2022+ out-of-sample window.
+- Feature importance is reported at both feature and cluster levels to account for correlated predictors.
+
+## Reproducibility Checklist
+
+Before rerunning later stages, make sure the upstream artifacts exist:
+
+| Stage | Required upstream artifact |
+| --- | --- |
+| Triple-barrier labels | `data/raw/ohlcv_data.csv`, `data/raw/primary_signals.csv` |
+| Model notebooks | Engineered feature matrix and triple-barrier label files |
+| Cluster feature importance | `results/model_comparison.csv` |
+| Final evaluation | `results/selected_model_run_configs.csv` |
+
+If a script cannot find an expected file, rerun the earlier stage that creates it.
