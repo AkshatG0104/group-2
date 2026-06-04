@@ -1,1 +1,17 @@
 ![Alt text](Methodology.png)
+
+1. pip install -r requirements.txt
+2. 01_feature_engineering/hmm/regime_detection.py
+3. 01_feature_engineering/hmm/regime_categories.py
+4. 01_feature_engineering/technical_analysis/technical_analysis.py
+5. 01_feature_engineering/feature_engineering_matrix.ipynb
+6. 01_feature_engineering/initial_feature_selection_with_low_variance_fixed.ipynb
+7. 02_triple_barrier/run_triple_barrier_configs.py
+8. 03_model_development/Linear/logistic_regression
+9. 03_model_development/Neural Network/variable_selection_network_ho1s.ipynb
+10. 03_model_development/Neural Network/variable_selection_network_cl1s.ipynb
+11. 03_model_development/Neural Network/variable_selection_network_ng1s.ipynb
+12. 03_model_development/Neural Network/variable_selection_network_rb1s.ipynb
+13. 03_model_development/Tree/random_forest.ipynb
+14. 04_feature_importance/feature_importance.ipynb
+15. 05_model_evaluation/05_model_evaluation.ipynb
