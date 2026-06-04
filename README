@@ -2,7 +2,7 @@
 
 ![Methodology overview](Methodology.jpg)
 
-Group-2 is a systematic trading machine-learning coursework project. The project builds meta-models on top of a supplied primary trading signal for futures markets. For each active primary signal, the meta-model estimates the probability that taking the trade will be profitable under a triple-barrier exit rule.
+This repository contains a systematic trading machine-learning coursework project developed by Group 2. The project builds meta-models on top of a supplied primary trading signal for futures markets. For each active primary signal, the meta-model estimates the probability that taking the trade will be profitable under a triple-barrier exit rule.
 
 The coursework pipeline follows the required structure:
 
@@ -12,6 +12,15 @@ The coursework pipeline follows the required structure:
 4. Cluster-level feature importance.
 5. Out-of-sample model evaluation and final prediction generation.
 6. Optional portfolio weight allocation from meta-model probabilities.
+
+## Main Deliverables
+
+This project produces two main deliverables:
+
+| Deliverable | Description |
+| --- | --- |
+| `final_prediction_csvs` | CSV files containing final meta-model predictions, including the estimated probability that each active primary signal should be taken. The current final file is `06_results/final_predictions.csv`. |
+| `neural_strategy_weights` | Outputs from the neural strategy layer, which uses model-generated probabilities to determine portfolio allocation weights. The current final file is `06_results/neural_strategy_weights.csv`. |
 
 ## Universe
 
@@ -121,6 +130,13 @@ data/features/triple_barrier/
 
 The implementation supports EWMA, rolling, Parkinson, and Garman-Klass volatility estimates. The batch script currently uses multiple take-profit/stop-loss widths and vertical barrier horizons.
 
+Triple-barrier logic:
+
+- Active primary signals receive take-profit, stop-loss, and vertical timeout barriers.
+- If the take-profit or stop-loss barrier is hit first, the event is labeled using the first touched horizontal barrier.
+- If the vertical barrier is reached first, the event times out.
+- Timeout events are not automatically failures: the `metalabel` is still based on profitability at the timeout price. If following the primary signal made money by timeout, `metalabel = 1`; otherwise, `metalabel = 0`.
+
 ### 3. Model Development
 
 Run the model-development notebooks:
@@ -139,6 +155,8 @@ The comparison workflow is expected to produce:
 ```text
 results/model_comparison.csv
 ```
+
+Model validation used CPCV, or combinatorial purged cross-validation, to train and validate models while reducing leakage from overlapping financial labels. This gave a more robust comparison across model families and hyperparameters than a single chronological split.
 
 ### 4. Feature Importance
 
@@ -243,3 +261,9 @@ The current final neural strategy weight output is:
 - Feature importance is reported at both feature and cluster levels to account for correlated predictors.
 - The portfolio allocation layer applies a 10% target volatility, 25% per-instrument cap, and 100% daily gross exposure cap.
 - The neural portfolio overlay minimizes penalized negative Sharpe through the equivalent maximization objective `sharpe - exposure_cost - turnover_cost`.
+
+## Future Work
+
+A natural next layer would be an opportunity model for days where the supplied primary signal is `0`. The current meta-model only decides whether to accept or reject active primary signals, so it ignores periods where the primary model stayed flat but the market may still have offered a profitable trade.
+
+The opportunity model would learn from zero-signal observations by asking whether a long or short position would have been profitable under a similar triple-barrier framework. Its output could become an additional strategy layer: first use the existing meta-model to filter active primary signals, then use the opportunity model to identify missed trades when the primary model is flat. This would make better use of the full dataset and could help capture trades the original primary signal failed to express.
